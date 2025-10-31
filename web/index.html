@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Наркокарта - Карта проблемных точек</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+    <!-- Font Awesome для иконок -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Loader -->
+    <div id="loader" class="loader">
+        <div class="spinner"></div>
+        <p>Загрузка...</p>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <h1>Наркокарта</h1>
+                </div>
+
+                <nav class="nav">
+                    <!-- Авторизация только через Telegram бот -->
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Фильтры</h2>
+                <button id="closeSidebar" class="btn-icon">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="filters">
+                <!-- Тип меток -->
+                <div class="filter-group">
+                    <label>Тип:</label>
+                    <div class="checkbox-group">
+                        <label>
+                            <input type="checkbox" name="type" value="den" checked>
+                            <i class="fas fa-home"></i> Притон
+                        </label>
+                        <label>
+                            <input type="checkbox" name="type" value="ad" checked>
+                            <i class="fas fa-bullhorn"></i> Реклама
+                        </label>
+                        <label>
+                            <input type="checkbox" name="type" value="courier" checked>
+                            <i class="fas fa-walking"></i> Курьер
+                        </label>
+                        <label>
+                            <input type="checkbox" name="type" value="user" checked>
+                            <i class="fas fa-user"></i> Употребление
+                        </label>
+                        <label>
+                            <input type="checkbox" name="type" value="trash" checked>
+                            <i class="fas fa-trash"></i> Мусор
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Кнопки -->
+                <div class="filter-actions">
+                    <button id="applyFilters" class="btn btn-primary btn-block">
+                        <i class="fas fa-filter"></i> Применить
+                    </button>
+                    <button id="resetFilters" class="btn btn-secondary btn-block">
+                        <i class="fas fa-undo"></i> Сбросить
+                    </button>
+                </div>
+
+                <!-- Статистика -->
+                <div class="stats" id="stats">
+                    <h3>Статистика</h3>
+                    <div class="stats-item">
+                        <span>Меток на карте:</span>
+                        <strong id="totalMarkers">0</strong>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="map"></div>
+
+            <!-- Floating Action Buttons -->
+            <div class="fab-container">
+                <button id="toggleSidebar" class="fab" title="Фильтры">
+                    <i class="fas fa-filter"></i>
+                </button>
+                <button id="myLocation" class="fab" title="Моё местоположение">
+                    <i class="fas fa-crosshairs"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Add Marker (Simplified) -->
+    <div id="markerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Добавить метку</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Координаты:</label>
+                    <div class="coords-display">
+                        <span id="markerLat"></span>, <span id="markerLon"></span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="markerType">Тип метки:</label>
+                    <select id="markerType" class="form-control">
+                        <option value="den">🏚 Притон</option>
+                        <option value="ad">📢 Реклама</option>
+                        <option value="courier">🚶 Курьер</option>
+                        <option value="user">💊 Употребление</option>
+                        <option value="trash">🗑 Мусор</option>
+                    </select>
+                    <small class="form-text">Цвет метки определяется автоматически по типу</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="markerAddress">Адрес:</label>
+                    <input type="text" id="markerAddress" placeholder="Улица, дом, подъезд, квартира, этаж..." class="form-control">
+                    <small class="form-text">При клике на карту здесь автоматически появятся координаты. Можете заменить на конкретный адрес</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="markerDescription">Описание проблемы (опционально):</label>
+                    <textarea id="markerDescription" rows="4" placeholder="Опишите проблему..." class="form-control"></textarea>
+                    <small class="form-text">Дополнительная информация о ситуации</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="markerPhoto">Фото (опционально):</label>
+                    <input type="file" id="markerPhoto" accept="image/*" class="form-control">
+                    <small class="form-text">Максимальный размер: 10MB. Фото поможет модераторам</small>
+                </div>
+
+                <button id="submitMarker" class="btn btn-primary btn-block">
+                    <i class="fas fa-map-marker-alt"></i> Создать метку
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
